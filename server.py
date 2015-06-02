@@ -30,7 +30,8 @@ def clientThread(csocket, caddr):
 
             #If everyone is ready, start the game
             if(ready == numConnections):
-                csocket.send("The game has begun!")
+                for client in connections:
+                    client[0].send("The game has begun!")
 
 
 def main():
