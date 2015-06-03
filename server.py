@@ -3,80 +3,104 @@ import socket
 import thread
 import threading
 
+from message import *
+
 #Global vars
 numConnections = 0
-ready = 0
+numReady = 0
 everyoneReady = threading.Condition()
 connections = []
-beginGame = 0
+
+#mode that the game is in and potential values (enum) for mode
+lobby = 0
+betweenCombat = 1
+inCombat = 2
+
+mode = lobby
 
 def serverThread(ssocket):
-    while 1:
-        (csocket, caddr) = ssocket.accept()
-        global numConnections
-        numConnections += 1
-        if beginGame == 0:
-            #We are in the lobby
-            global connections
-            connections.append((csocket, caddr))
-            print("New connection: " + caddr[0])
-            csocket.send("Connected")
-            thread.start_new_thread(clientThread, (csocket, caddr))
+	global numConnections, connections
+
+	while 1:
+		(csocket, caddr) = ssocket.accept()
+		numConnections += 1
+		if mode == lobby:
+			#We are in the lobby
+			connections.append((csocket, caddr))
+			print("New connection: " + caddr[0])
+			csocket.send(lobbyMsg.connected)
+			thread.start_new_thread(clientThread, (csocket, caddr))
 
 def clientThread(csocket, caddr):
-    #Recieve client messages
-    while 1:
-        message = csocket.recv(1024)
+	global numConnections, numReady, everyoneReady
 
-        #Client disconnect
-        if message == "Close" or message == 0:
-            csocket.close()
+	isReady = False
 
-            #Close if all connections lost
-            global numConnections
-            numConnections -= 1
-            if numConnections < 1:
-                break
+	#Recieve client messages
+	while 1:
+		msg = csocket.recv(1024)
+		print msg
 
-        #Client ready to begin
-        if message == "Ready":
-            print(caddr[0] + " is ready!")
-            global ready
-            ready += 1
+		#Client disconnect
+		if msg == 0:
+			print 'hi'
+			csocket.close()
 
-            if ready == numConnections:
-                global everyoneReady
-                everyoneReady.acquire()
-                everyoneReady.notifyAll()
-                everyoneReady.release()
+			#Close if all connections lost
+			numConnections -= 1
+			if numConnections < 1:
+				break
+
+		#Client ready to begin
+		elif msg == lobbyMsg.ready:
+			if isReady != True:
+				numReady += 1
+				isReady = True
+				print(caddr[0] + " is ready!")
+
+			if numReady == numConnections:
+				#Notify main thread to start game
+				everyoneReady.acquire()
+				everyoneReady.notifyAll()
+				everyoneReady.release()
+			else:
+				csocket.send(lobbyMsg.waitOnOthers)
+
+		elif msg == lobbyMsg.notReady:
+			if isReady != False:
+				numReady -= 1
+				isReady = False
+				print(caddr[0] + " is not ready!")
 
 
 def main():
-    ssocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        ssocket.bind(('', 80))
-    except socket.error as msg:
-        print("Bind failed. Error code: " + str(msg[0]))
+	global everyoneReady, mode
 
-    ssocket.listen(5)
-    print("Server ready")
+	ssocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	try:
+		ssocket.bind(('', 80))
+	except socket.error as msg:
+		print("Bind failed. Error code: " + str(msg[0]))
+		quit()
 
-    thread.start_new_thread(serverThread, (ssocket,))
+	ssocket.listen(5)
+	print("Server ready")
 
-    #If everyone is ready, start the game
-    global everyoneReady
-    everyoneReady.acquire()
-    while(ready != numConnections or numConnections == 0):
-        everyoneReady.wait()
-    everyoneReady.release()
+	thread.start_new_thread(serverThread, (ssocket,))
 
-    for client in connections:
-        client[0].send("The game has begun!")
-        global beginGame
-        beginGame = 1
+	#If everyone is ready, start the game
+	everyoneReady.acquire()
+	while(numReady != numConnections or numConnections == 0):
+		#Don't start the game until all players in lobby are ready
+		everyoneReady.wait()
+	everyoneReady.release()
 
-    print("Ready set go!")
-    quit()
+	for client in connections:
+		client[0].send(lobbyMsg.beginGame)
+		mode = betweenCombat
+
+	print("Ready set go!")
+	quit()
 
 if __name__ == '__main__':
 	main()
