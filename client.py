@@ -26,14 +26,20 @@ def main():
 	csocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	csocket.connect((saddr, 80))
 
-	while(1):
-		msg = csocket.recv(1024)
-		if msg == 0:
-			print "Didn't receive data from the server!"
-			exit()
+	try:
+		while(1):
+			try:
+				msg = csocket.recv(1024)
+				if msg == '':
+					raise socket.error
+			except socket.error as e:
+				print "Didn't receive data from the server!"
+				exit()
 
-		if msg[0:headerLen] == lobbyMsg.head:
-			enterLobby(csocket, msg)
+			if msg[0:headerLen] == lobbyMsg.head:
+				enterLobby(csocket, msg)
+	finally:
+			csocket.close()
 
 if __name__ == '__main__':
 	main()

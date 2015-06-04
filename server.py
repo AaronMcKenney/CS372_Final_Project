@@ -38,21 +38,21 @@ def clientThread(csocket, caddr):
 
 	#Recieve client messages
 	while 1:
-		msg = csocket.recv(1024)
-		print msg
-
-		#Client disconnect
-		if msg == 0:
-			print 'hi'
+		try:
+			msg = csocket.recv(1024)
+			if msg == '':
+				raise socket.error
+		except socket.error as e:
 			csocket.close()
-
-			#Close if all connections lost
 			numConnections -= 1
-			if numConnections < 1:
-				break
+			connections.pop(connections.index((csocket, caddr)))
+			if isReady == True:
+				numReady -= 1
+			print caddr[0] + ' closed!'
+			return
 
 		#Client ready to begin
-		elif msg == lobbyMsg.ready:
+		if msg == lobbyMsg.ready:
 			if isReady != True:
 				numReady += 1
 				isReady = True
