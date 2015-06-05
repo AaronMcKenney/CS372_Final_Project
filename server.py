@@ -4,6 +4,7 @@ import thread
 import threading
 
 from message import *
+from player import *
 
 #Global vars
 numConnections = 0
@@ -23,15 +24,25 @@ def serverThread(ssocket):
 
 	while 1:
 		(csocket, caddr) = ssocket.accept()
+		#Upon connection, get the client's name
+		try:
+			msg = csocket.recv(1024)
+			if msg == '' or msg[0:headerLen] != NameMsg.head:
+				raise socket.error
+		except socket.error as e:
+			csocket.close()
+			return
+		cname = msg[headerLen:]
+
 		numConnections += 1
 		if mode == lobby:
 			#We are in the lobby
-			connections.append((csocket, caddr))
-			print("New connection: " + caddr[0])
-			csocket.send(lobbyMsg.connected)
-			thread.start_new_thread(clientThread, (csocket, caddr))
+			connections.append((csocket, caddr, cname))
+			print("New connection: " + cname + " at " + caddr[0])
+			csocket.send(LobbyMsg.connect)
+			thread.start_new_thread(clientThread, (csocket, caddr, cname))
 
-def clientThread(csocket, caddr):
+def clientThread(csocket, caddr, cname):
 	global numConnections, numReady, everyoneReady
 
 	isReady = False
@@ -52,7 +63,7 @@ def clientThread(csocket, caddr):
 			return
 
 		#Client ready to begin
-		if msg == lobbyMsg.ready:
+		if msg == LobbyMsg.ready:
 			if isReady != True:
 				numReady += 1
 				isReady = True
@@ -64,13 +75,22 @@ def clientThread(csocket, caddr):
 				everyoneReady.notifyAll()
 				everyoneReady.release()
 			else:
-				csocket.send(lobbyMsg.waitOnOthers)
+				csocket.send(LobbyMsg.waitOnOthers)
 
-		elif msg == lobbyMsg.notReady:
+		elif msg == LobbyMsg.notReady:
 			if isReady != False:
 				numReady -= 1
 				isReady = False
 				print(caddr[0] + " is not ready!")
+
+
+def createPlayers(plist):
+	global connections
+	for (csocket, caddr, cname) in connections:
+		plist.append(Player(csocket, caddr, cname, Character("Red Eye", 50, 50)))
+	for player in plist:
+		player.sendPartyData(plist)
+
 
 
 def main():
@@ -96,10 +116,13 @@ def main():
 	everyoneReady.release()
 
 	for client in connections:
-		client[0].send(lobbyMsg.beginGame)
+		client[0].send(LobbyMsg.beginGame)
 		mode = betweenCombat
 
 	print("Ready set go!")
+	players = []
+	#createPlayers(players)
+
 	quit()
 
 if __name__ == '__main__':

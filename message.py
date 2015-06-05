@@ -4,13 +4,17 @@
 #Headers must be unique
 headerLen = 1
 
-class lobbyMsg:
+class LobbyMsg:
 	head = 'L'
-
 	#Server related lobby messages
-	connected = head + ':C'
+	connect = head + ':C'
 	waitOnOthers = head + ':W'
 	beginGame = head + ':B'
 	#Client related lobby messages
 	ready = head + ':Y'
 	notReady = head + ':N'
+
+class NameMsg:
+	head = 'N'
+
+
