@@ -48,40 +48,39 @@ def clientThread(csocket, caddr, cname):
 	isReady = False
 
 	#Recieve client messages
-	while 1:
-		try:
-			msg = csocket.recv(1024)
-			if msg == '':
-				raise socket.error
-		except socket.error as e:
-			csocket.close()
-			numConnections -= 1
-			connections.pop(connections.index((csocket, caddr)))
-			if isReady == True:
-				numReady -= 1
-			print caddr[0] + ' closed!'
-			return
+	try:
+		msg = csocket.recv(1024)
+		if msg == '':
+			raise socket.error
+	except socket.error as e:
+		csocket.close()
+		numConnections -= 1
+		connections.pop(connections.index((csocket, caddr)))
+		if isReady == True:
+			numReady -= 1
+		print caddr[0] + ' closed!'
+		return
 
-		#Client ready to begin
-		if msg == LobbyMsg.ready:
-			if isReady != True:
-				numReady += 1
-				isReady = True
-				print(cname + " is ready!")
+	#Client ready to begin
+	if msg == LobbyMsg.ready:
+		if isReady != True:
+			numReady += 1
+			isReady = True
+			print(cname + " is ready!")
 
-			if numReady == numConnections:
-				#Notify main thread to start game
-				everyoneReady.acquire()
-				everyoneReady.notifyAll()
-				everyoneReady.release()
-			else:
-				csocket.sendall(LobbyMsg.waitOnOthers)
+		if numReady == numConnections:
+			#Notify main thread to start game
+			everyoneReady.acquire()
+			everyoneReady.notifyAll()
+			everyoneReady.release()
+		else:
+			csocket.sendall(LobbyMsg.waitOnOthers)
 
-		elif msg == LobbyMsg.notReady:
-			if isReady != False:
-				numReady -= 1
-				isReady = False
-				print(caddr[0] + " is not ready!")
+	elif msg == LobbyMsg.notReady:
+		if isReady != False:
+			numReady -= 1
+			isReady = False
+			print(caddr[0] + " is not ready!")
 
 
 def createPlayers():
