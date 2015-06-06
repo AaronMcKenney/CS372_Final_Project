@@ -32,12 +32,12 @@ class Player:
 			if msg == '':
 				raise socket.error
 			return msg
-		except socket.error as e:
+		except socket.error:
 			self.sock.close()
 			return ''
 
 	def getStats(self):
-		return 'hi\n'
+		return "Player name: " + self.name + "\n" + self.character.getStats()
 
 	def sendPartyStats(self, plist):
 		ownStats = 'You:\n'
@@ -53,4 +53,3 @@ class Player:
 		self.send(StatsMsg.party + ownStats + otherPlayerStats)
 		if self.recv() != StatsMsg.ack:
 			print self.name + ' did not receive party stats'
-		print 'received ack1'
