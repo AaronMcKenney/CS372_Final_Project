@@ -9,7 +9,7 @@ class Player:
 		self.sock = psocket
 		self.addr = paddr
 		self.name = pname
-		self.character = Character(charinfo['Name'], charinfo['Description'], charinfo['Health'], charinfo['Mana'])
+		self.character = Character(charinfo['Name'], charinfo['Description'], charinfo['Health'], charinfo['Mana'], charinfo['Attacks'])
 
 	def __del__(self):
 		self.sock.close()
@@ -39,6 +39,9 @@ class Player:
 	def getStats(self):
 		return "Player name: " + self.name + "\n" + self.character.getStats()
 
+	def getAttacks(self):
+		return self.character.getAttacks()
+
 	def sendPartyStats(self, plist):
 		ownStats = 'You:\n'
 		otherPlayerStats = '\nYour Party:\n'
@@ -46,8 +49,10 @@ class Player:
 		for player in plist:
 			if self.__eq__(player):
 				ownStats += player.getStats()
+				ownStats += player.getAttacks()
 			else:
 				otherPlayerStats += player.getStats()
+				otherPlayerStats += player.getAttacks()
 
 		#List your own stats first, and then list everyone elses
 		self.send(StatsMsg.party + ownStats + otherPlayerStats)
