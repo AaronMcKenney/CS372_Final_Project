@@ -4,8 +4,13 @@
 #Headers must be unique
 headerLen = 1
 
+#Client sends name upon connecting to server
+class NameMsg:
+	head = 'N'
+
 class LobbyMsg:
 	head = 'L'
+
 	#Server related lobby messages
 	connect = head + ':C'
 	waitOnOthers = head + ':W'
@@ -14,7 +19,14 @@ class LobbyMsg:
 	ready = head + ':Y'
 	notReady = head + ':N'
 
-class NameMsg:
-	head = 'N'
+#Server sends stats to clients
+#Client requests stats from clients
+class StatsMsg:
+	head = 'S'
 
-
+	#Server related stats messages
+	self = head + ':Y'
+	party = head + ':P'
+	enemies = head + ':E'
+	#Cliient related stats messages
+	ack = head + ':A'

@@ -39,7 +39,7 @@ def serverThread(ssocket):
 			#We are in the lobby
 			connections.append((csocket, caddr, cname))
 			print("New connection: " + cname + " at " + caddr[0])
-			csocket.send(LobbyMsg.connect)
+			csocket.sendall(LobbyMsg.connect)
 			thread.start_new_thread(clientThread, (csocket, caddr, cname))
 
 def clientThread(csocket, caddr, cname):
@@ -67,7 +67,7 @@ def clientThread(csocket, caddr, cname):
 			if isReady != True:
 				numReady += 1
 				isReady = True
-				print(caddr[0] + " is ready!")
+				print(cname + " is ready!")
 
 			if numReady == numConnections:
 				#Notify main thread to start game
@@ -75,7 +75,7 @@ def clientThread(csocket, caddr, cname):
 				everyoneReady.notifyAll()
 				everyoneReady.release()
 			else:
-				csocket.send(LobbyMsg.waitOnOthers)
+				csocket.sendall(LobbyMsg.waitOnOthers)
 
 		elif msg == LobbyMsg.notReady:
 			if isReady != False:
@@ -84,14 +84,15 @@ def clientThread(csocket, caddr, cname):
 				print(caddr[0] + " is not ready!")
 
 
-def createPlayers(plist):
+def createPlayers():
 	global connections
+
+	plist = []
+
 	for (csocket, caddr, cname) in connections:
 		plist.append(Player(csocket, caddr, cname, Character("Red Eye", 50, 50)))
-	for player in plist:
-		player.sendPartyData(plist)
 
-
+	return plist
 
 def main():
 	global everyoneReady, mode
@@ -116,14 +117,13 @@ def main():
 	everyoneReady.release()
 
 	for client in connections:
-		client[0].send(LobbyMsg.beginGame)
+		client[0].sendall(LobbyMsg.beginGame)
 		mode = betweenCombat
 
 	print("Ready set go!")
-	players = []
-	#createPlayers(players)
-
-	quit()
+	players = createPlayers()
+	for player in players:
+		player.sendPartyStats(players)
 
 if __name__ == '__main__':
 	main()

@@ -9,13 +9,19 @@ def enterLobby(csocket, msg):
 		lobbyRes = "N"
 		while(lobbyRes != "Y" and lobbyRes != "y"):
 			lobbyRes = raw_input("Ready to begin? (Y/N) ")
-		csocket.send(LobbyMsg.ready)
+		csocket.sendall(LobbyMsg.ready)
 
 	elif msg == LobbyMsg.waitOnOthers:
 		print("Waiting on others...")
 
 	elif msg == LobbyMsg.beginGame:
 		print("Let the game begin!")
+
+def printStats(csocket, msg):
+	print msg
+
+	csocket.sendall(StatsMsg.ack)
+	print 'Sent Ack!'
 
 def main():
 	if len(sys.argv) < 3:
@@ -28,7 +34,7 @@ def main():
 	csocket.connect((saddr, 80))
 
 	try:
-		csocket.send(NameMsg.head + cname)
+		csocket.sendall(NameMsg.head + cname)
 		while(1):
 			try:
 				msg = csocket.recv(1024)
@@ -40,6 +46,9 @@ def main():
 
 			if msg[0:headerLen] == LobbyMsg.head:
 				enterLobby(csocket, msg)
+
+			if msg[0:headerLen] == StatsMsg.head:
+				printStats(csocket, msg[3:])
 
 	finally:
 			csocket.close()
