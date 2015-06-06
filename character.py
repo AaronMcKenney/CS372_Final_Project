@@ -1,8 +1,8 @@
 class Character:
 
-	def __init__(self, cname, chealth, cmana):
+	def __init__(self, cname, cdesc, chealth, cmana):
 		self.name = cname
-		self.description = ''
+		self.description = cdesc
 		self.maxHealth = chealth
 		self.health = chealth
 		self.maxMana = cmana

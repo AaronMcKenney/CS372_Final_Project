@@ -2,6 +2,8 @@ import sys
 import socket
 import thread
 import threading
+import json
+from random import shuffle
 
 from message import *
 from player import *
@@ -86,10 +88,17 @@ def clientThread(csocket, caddr, cname):
 def createPlayers():
 	global connections
 
+	charInfo = []
+	charFile = open('characters.json', 'r')
+	characters = json.load(charFile)
+	characters = characters["Characters"]
+	#print characters["Characters"][0]["Name"]
+	shuffle(characters)
+
 	plist = []
 
-	for (csocket, caddr, cname) in connections:
-		plist.append(Player(csocket, caddr, cname, Character("Red Eye", 50, 50)))
+	for i, (csocket, caddr, cname) in enumerate(connections):
+		plist.append(Player(csocket, caddr, cname, characters[i]))
 
 	return plist
 

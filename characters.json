@@ -1,0 +1,7 @@
+{
+"Characters":[
+{"Name":"Red Eye", "Description":"He's ready to go!", "Health":"50", "Mana":"50"},
+{"Name":"Bob the kid", "Description":"He's a kid now. He's a squid now.", "Health":"75", "Mana":"25"},
+{"Name":"Pink Eye", "Description":"A giant floating pink eye.", "Health":"500", "Mana":"50"}
+]
+}
