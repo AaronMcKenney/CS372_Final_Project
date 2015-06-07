@@ -9,6 +9,9 @@ class Character(object):
 		self.mana = cmana
 		self.attacks = cattacks
 
+	def getName(self):
+		return self.name
+		
 	def getStats(self):
 		statsOut = 'Character name: ' + self.name + '\n'
 		statsOut += '\tDescription: ' + self.description + '\n'
@@ -16,8 +19,8 @@ class Character(object):
 		statsOut += '\tMP: ' + str(self.mana) + '/' + str(self.maxMana) + '\n'
 
 		return statsOut
-
-	def getAttacks(self):
+		
+	def getAttacksStr(self):
 		attacksOut = '\tAttacks: \n'
 		count = 0
 		for attack in self.attacks:
@@ -25,6 +28,9 @@ class Character(object):
 			attacksOut += '\t\t' + str(count) + ". " + attack['Name'] + ": " + str(attack['Damage']) + '\n'
 		
 		return attacksOut
+
+	def getAttack(self, index):
+		return self.attacks[index]
 		
 	def getNumAttacks(self):
 		attacksOut = 0
@@ -37,3 +43,23 @@ class Character(object):
 		if self.health > 0:
 			return True
 		return False
+		
+	def hit(self, monster, attack):
+		#Get attacked by monster with attack
+		#Calculate new hp and string to send to party
+		resultStr = monster.getName() + ' used ' + attack['Name'] + '!\n'
+		prevHealth = self.health
+		self.health -= attack['Damage']
+		if self.health < 0:
+			self.health = 0
+		
+		damageDealt = prevHealth - self.health
+		resultStr += self.name + ' took ' + str(damageDealt) + ' damage\n'
+		resultStr += self.name + ' has ' + str(self.health) + ' HP left\n'
+		
+		if not self.isAlive():
+			resultStr += self.name + ' has been slain!\n'
+			
+		resultStr += '\n'
+		
+		return resultStr

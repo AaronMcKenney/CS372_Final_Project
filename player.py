@@ -24,8 +24,13 @@ class Player(object):
 		return not self.__eq__(other)
 
 	def send(self, data):
-		self.sock.sendall(data)
-
+		try:
+			self.sock.sendall(data)
+		except socket.error:
+			self.sock.close()
+			return -1
+		return 1
+			
 	def recv(self):
 		try:
 			msg = self.sock.recv(1024)
@@ -38,12 +43,18 @@ class Player(object):
 
 	def getName(self):
 		return self.name
+		
+	def getCharName(self):
+		return self.character.getName()
 			
 	def getStats(self):
 		return "Player name: " + self.name + "\n" + self.character.getStats()
 
-	def getAttacks(self):
-		return self.character.getAttacks()
+	def getAttacksStr(self):
+		return self.character.getAttacksStr()
+
+	def getAttack(self, index):
+		return self.character.getAttack(index)
 		
 	def getNumAttacks(self):
 		return self.character.getNumAttacks()
@@ -58,10 +69,10 @@ class Player(object):
 		for player in plist:
 			if self.__eq__(player):
 				ownStats += player.getStats()
-				ownStats += player.getAttacks()
+				ownStats += player.getAttacksStr()
 			else:
 				otherPlayerStats += player.getStats()
-				otherPlayerStats += player.getAttacks()
+				otherPlayerStats += player.getAttacksStr()
 
 		#List your own stats first, and then list everyone elses
 		self.send(StatsMsg.party + ownStats + otherPlayerStats)
@@ -78,10 +89,11 @@ class Player(object):
 	def isAlive(self):
 		return self.character.isAlive()
 	
-	def getLegalAttack(self, attackStr):
+	def getLegalAttackIndex(self, attackStr):
 		#Takes in a client's chosen attack and ensures
 		#that they picked a legal move
 		#Returns -1 if bad/illegal, or index in attack list
+		
 		if len(attackStr) > optionLen + 1:
 			return -1
 		option = attackStr[0:optionLen]
@@ -95,3 +107,6 @@ class Player(object):
 		if attack < 1 or attack > self.character.getNumAttacks():
 			return -1
 		return attack
+		
+	def hit(self, monster, attack):
+		return self.character.hit(monster, attack)

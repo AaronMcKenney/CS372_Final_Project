@@ -93,7 +93,6 @@ def createPlayers():
 	charFile = open('characters.json', 'r')
 	characters = json.load(charFile)
 	characters = characters["Characters"]
-	#print characters["Characters"][0]["Name"]
 	shuffle(characters)
 
 	plist = []
@@ -130,12 +129,20 @@ def partyLives(players):
 		if player.isAlive():
 			return True
 	return False
-			
-def playGame(players, monsters):
 	
-	#Get new monster
-	curMonster = monsters.pop()
+def removeFromBattle(player, players, turnList):
+	#Remove player from players and from turnList
+	print player.getName() + ' did not recv attack attack msg. Booting from battle'
+	turnList.remove(player)
+	players.remove(player)
+	if len(players) == 0:
+		print 'No remaining players in the party!'
 	
+def Battle(players, curMonster):
+	#Battle between players and one monster
+	#Returns 1 if players win, -1 if monster wins,
+	#and 0 if all players disconnects
+
 	#Ensures that a player can only be lost from this battle
 	players = list(players)
 	if len(players) == 0:
@@ -153,36 +160,59 @@ def playGame(players, monsters):
 	
 	while(curMonster.isAlive() and partyLives(players)):
 		for thing in turnList:
-			if type(thing) is Player:
-				thing.send(AttackMsg.one + '\nYour turn!\n' + thing.getAttacks())
-				if thing.recv() != AttackMsg.ack:
+			if type(thing) is Player and thing.isAlive():
+				#Tell the player it's their turn
+				thing.send(AttackMsg.one + '\nYour turn!\n' + thing.getAttacksStr())
+				msg = thing.recv()
+				if msg != AttackMsg.ack:
 					#Assume a disconnect, remove them from this battle
 					#Pray that they reconnect before the next battle
-					print thing.getName() + ' did not recv attack. Booting from battle'
-					turnList.remove(thing)
-					players.remove(thing)
+					removeFromBattle(thing, players, turnList)
 					if len(players) == 0:
-						print 'All players booted!'
-						return
+						return 0
 					continue
+					
+				#Ask the player to choose an attack
 				thing.send(AttackMsg.num + str(thing.getNumAttacks()))
 				chosenAttack = thing.recv()
-				attackIndex = thing.getLegalAttack(chosenAttack)
+				attackIndex = thing.getLegalAttackIndex(chosenAttack)
 				if attackIndex == -1:
 					#Illegal (or bad) attack
 					#Remove them from battle and put them in the corner
-					print thing.getName() + ' gave bad attack. Booting from battle.'
-					turnList.remove(thing)
-					players.remove(thing)
+					removeFromBattle(thing, players, turnList)
 					if len(players) == 0:
-						print 'All players booted!'
-						return
+						return 0
 					continue
-				print attackIndex
-			else:
-				print "MONSTER"
-				time.sleep(5)
+				chosenAttack = thing.getAttack(attackIndex-1)
 
+				#Send results of attack to all players
+				resultStr = curMonster.hit(thing, chosenAttack)
+				for player in players:
+					player.send(AttackMsg.many + resultStr)
+					msg = player.recv()
+					if msg != AttackMsg.ack:
+						#Assume a disconnect, remove them from this battle
+						#Pray that they reconnect before the next battle
+						removeFromBattle(player, players, turnList)
+						if len(players) == 0:
+							return 0
+				if not curMonster.isAlive():
+					turnList.remove(curMonster)
+					return 1
+				
+			else:
+				#Monster's turn
+				(chosenPlayer, chosenAttack) = curMonster.getRandAttack(players)
+				resultStr = chosenPlayer.hit(curMonster, chosenAttack)
+				for player in players:
+					player.send(AttackMsg.many + resultStr)
+					msg = player.recv()
+					if msg != AttackMsg.ack:
+						removeFromBattle(player, players, turnList)
+						if len(players) == 0:
+							return 0
+				if not partyLives(players):
+					return -1
 def main():
 	global everyoneReady, mode
 
@@ -216,8 +246,24 @@ def main():
 
 	monsters = createMonsters()
 	
-	#Start Game
-	playGame(players, monsters)
+	#Start Game 
+	res = 0
+	for monster in monsters:
+		res = Battle(players, monster)
+		if res != 1:
+			break
 	
+	if res == -1:
+		end = EndMsg.loss
+		print 'the party has lost'
+	else:
+		end = EndMsg.win
+		print 'the party has won'
+	for player in players:
+		player.send(end)
+		if player.recv() != EndMsg.ack:
+				print player.getName() + ' did not get EndMsg'				
+	
+	print 'shutting down'
 if __name__ == '__main__':
 	main()

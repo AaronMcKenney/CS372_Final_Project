@@ -30,7 +30,7 @@ def printStats(csocket, option, msg):
 	csocket.sendall(StatsMsg.ack)
 
 def inBattle(csocket, option, message):
-	if option == AttackMsg.one:
+	if option == AttackMsg.one or option == AttackMsg.many:
 		#Print what attacks the client's character can make
 		print message
 		csocket.sendall(AttackMsg.ack)
@@ -70,19 +70,31 @@ def main():
 				print("Didn't receive data from the server!")
 				exit()
 
-			if msg[0:headerLen] == LobbyMsg.head:
+			msgHead = msg[0:headerLen]
+				
+			if msgHead == LobbyMsg.head:
 				enterLobby(csocket, msg)
 
-			elif msg[0:headerLen] == StatsMsg.head:
+			elif msgHead == StatsMsg.head:
 				printStats(csocket, msg[0:optionLen], msg[optionLen:])
 				
-			elif msg[0:headerLen] == ConnMsg.head:
+			elif msgHead == ConnMsg.head:
 				if msg == ConnMsg.ping:
 					csocket.sendall(ConnMsg.pong)
 					
-			elif msg[0:headerLen] == AttackMsg.head:
+			elif msgHead == AttackMsg.head:
 				inBattle(csocket, msg[0:optionLen], msg[optionLen:])
-					
+			
+			elif msgHead == EndMsg.head:
+				if msg == EndMsg.loss:
+					print 'Your party has lost!'
+					csocket.sendall(EndMsg.ack)
+				else:
+					print 'Your party has won!'
+					csocket.sendall(EndMsg.ack)
+				csocket.close()
+				return
+			
 			else:
 				print 'Server sent a bad message: ', msg
 	finally:

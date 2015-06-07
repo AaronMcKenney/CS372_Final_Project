@@ -56,3 +56,14 @@ class AttackMsg:
 	many = head + 'M:'
 	
 	ack = head + 'A:'
+	
+class EndMsg:
+	head = 'E'
+	
+	#Server says party wins
+	win = head + 'W:'
+	#Server says party loses
+	loss = head + 'L:'
+	
+	#Client says ack
+	ack = head + 'A:'
