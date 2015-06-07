@@ -4,6 +4,8 @@ import string
 
 from message import *
 
+inBattle = False
+
 def enterLobby(csocket, msg):
 	if msg == LobbyMsg.connect:
 		lobbyRes = "N"
@@ -17,12 +19,36 @@ def enterLobby(csocket, msg):
 	elif msg == LobbyMsg.beginGame:
 		print("Let the game begin!")
 
-def printStats(csocket, msg):
+def printStats(csocket, option, msg):
+	global inBattle
+	
+	if option == StatsMsg.monster and inBattle == False:
+		inBattle = True
+		print 'A monster draws near your party!'
 	print msg
-
+		
 	csocket.sendall(StatsMsg.ack)
-	print 'Sent Ack!'
 
+def inBattle(csocket, option, message):
+	if option == AttackMsg.one:
+		#Print what attacks the client's character can make
+		print message
+		csocket.sendall(AttackMsg.ack)
+	elif option == AttackMsg.num:
+		#Server is requesting the client to make an attack
+		numAttacks = int(message)
+		chosenAttack = -1
+		while chosenAttack < 1 or chosenAttack > numAttacks:
+			try:
+				chosenAttack = int(raw_input("Choose an attack (enter number between 1 and " + str(numAttacks) + "): "))
+			except ValueError:
+				print 'Not an integer'
+				chosenAttack = -1
+		csocket.sendall(AttackMsg.num + str(chosenAttack))
+	elif option == AttackMsg.many:
+		#Server is printing results of an attack made
+		print message
+	
 def main():
 	if len(sys.argv) < 3:
 		print('Enter your name and the IP address for the server.')
@@ -47,9 +73,18 @@ def main():
 			if msg[0:headerLen] == LobbyMsg.head:
 				enterLobby(csocket, msg)
 
-			if msg[0:headerLen] == StatsMsg.head:
-				printStats(csocket, msg[3:])
-
+			elif msg[0:headerLen] == StatsMsg.head:
+				printStats(csocket, msg[0:optionLen], msg[optionLen:])
+				
+			elif msg[0:headerLen] == ConnMsg.head:
+				if msg == ConnMsg.ping:
+					csocket.sendall(ConnMsg.pong)
+					
+			elif msg[0:headerLen] == AttackMsg.head:
+				inBattle(csocket, msg[0:optionLen], msg[optionLen:])
+					
+			else:
+				print 'Server sent a bad message: ', msg
 	finally:
 			csocket.close()
 

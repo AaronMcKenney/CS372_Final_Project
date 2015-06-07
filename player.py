@@ -3,7 +3,7 @@ import socket
 from character import *
 from message import *
 
-class Player:
+class Player(object):
 
 	def __init__(self, psocket, paddr, pname, charinfo):
 		self.sock = psocket
@@ -36,16 +36,25 @@ class Player:
 			self.sock.close()
 			return ''
 
+	def getName(self):
+		return self.name
+			
 	def getStats(self):
 		return "Player name: " + self.name + "\n" + self.character.getStats()
 
 	def getAttacks(self):
 		return self.character.getAttacks()
+		
+	def getNumAttacks(self):
+		return self.character.getNumAttacks()
 
 	def sendPartyStats(self, plist):
 		ownStats = 'You:\n'
-		otherPlayerStats = '\nYour Party:\n'
-
+		if len(plist) != 1:
+			otherPlayerStats = '\nYour Party:\n'
+		else:
+			otherPlayerStats = ''
+			
 		for player in plist:
 			if self.__eq__(player):
 				ownStats += player.getStats()
@@ -58,3 +67,31 @@ class Player:
 		self.send(StatsMsg.party + ownStats + otherPlayerStats)
 		if self.recv() != StatsMsg.ack:
 			print self.name + ' did not receive party stats'
+
+	def isConnected(self):
+		self.send(ConnMsg.ping)
+		if self.recv() != ConnMsg.pong:
+			print self.name + ' disconnected!'
+			return False
+		return True
+		
+	def isAlive(self):
+		return self.character.isAlive()
+	
+	def getLegalAttack(self, attackStr):
+		#Takes in a client's chosen attack and ensures
+		#that they picked a legal move
+		#Returns -1 if bad/illegal, or index in attack list
+		if len(attackStr) > optionLen + 1:
+			return -1
+		option = attackStr[0:optionLen]
+		if option != AttackMsg.num:
+			return -1
+		try:
+			attack = int(attackStr[optionLen:])
+		except ValueError:
+			return -1
+		
+		if attack < 1 or attack > self.character.getNumAttacks():
+			return -1
+		return attack

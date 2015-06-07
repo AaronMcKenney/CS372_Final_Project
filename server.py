@@ -1,4 +1,5 @@
 import sys
+import time
 import socket
 import thread
 import threading
@@ -7,6 +8,7 @@ from random import shuffle
 
 from message import *
 from player import *
+from monster import *
 
 #Global vars
 numConnections = 0
@@ -49,7 +51,7 @@ def clientThread(csocket, caddr, cname):
 
 	isReady = False
 
-	#Recieve client messages
+	#Receive client messages
 	try:
 		msg = csocket.recv(1024)
 		if msg == '':
@@ -88,7 +90,6 @@ def clientThread(csocket, caddr, cname):
 def createPlayers():
 	global connections
 
-	charInfo = []
 	charFile = open('characters.json', 'r')
 	characters = json.load(charFile)
 	characters = characters["Characters"]
@@ -101,6 +102,86 @@ def createPlayers():
 		plist.append(Player(csocket, caddr, cname, characters[i]))
 
 	return plist
+	
+def createMonsters():
+
+	monstFile = open('monsters.json', 'r')
+	monsters = json.load(monstFile)
+	monsters = monsters["Monsters"]
+	shuffle(monsters)
+
+	mlist = []
+
+	for monst in monsters:
+		mlist.append(Monster(monst['Name'], monst['Description'], monst['Health'], monst['Attacks']))
+
+	return mlist
+	
+def getConnectedPlayers(players):
+	connPlayers = []
+	for player in players:
+		if player.isConnected:
+			connPlayers.append(player)
+			
+	return connPlayers
+	
+def partyLives(players):
+	for player in players:
+		if player.isAlive():
+			return True
+	return False
+			
+def playGame(players, monsters):
+	
+	#Get new monster
+	curMonster = monsters.pop()
+	
+	#Ensures that a player can only be lost from this battle
+	players = list(players)
+	if len(players) == 0:
+		print 'no players in battle!'
+		return
+	for player in players:
+		player.send(StatsMsg.monster + curMonster.getStats())
+		if player.recv() != StatsMsg.ack:
+			players.remove(player)
+		
+	#Get turn order
+	turnList = list(players)
+	turnList.append(curMonster)
+	shuffle(turnList)
+	
+	while(curMonster.isAlive() and partyLives(players)):
+		for thing in turnList:
+			if type(thing) is Player:
+				thing.send(AttackMsg.one + '\nYour turn!\n' + thing.getAttacks())
+				if thing.recv() != AttackMsg.ack:
+					#Assume a disconnect, remove them from this battle
+					#Pray that they reconnect before the next battle
+					print thing.getName() + ' did not recv attack. Booting from battle'
+					turnList.remove(thing)
+					players.remove(thing)
+					if len(players) == 0:
+						print 'All players booted!'
+						return
+					continue
+				thing.send(AttackMsg.num + str(thing.getNumAttacks()))
+				chosenAttack = thing.recv()
+				attackIndex = thing.getLegalAttack(chosenAttack)
+				if attackIndex == -1:
+					#Illegal (or bad) attack
+					#Remove them from battle and put them in the corner
+					print thing.getName() + ' gave bad attack. Booting from battle.'
+					turnList.remove(thing)
+					players.remove(thing)
+					if len(players) == 0:
+						print 'All players booted!'
+						return
+					continue
+				print attackIndex
+			else:
+				print "MONSTER"
+				time.sleep(5)
 
 def main():
 	global everyoneReady, mode
@@ -133,5 +214,10 @@ def main():
 	for player in players:
 		player.sendPartyStats(players)
 
+	monsters = createMonsters()
+	
+	#Start Game
+	playGame(players, monsters)
+	
 if __name__ == '__main__':
 	main()

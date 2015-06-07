@@ -1,4 +1,4 @@
-class Character:
+class Character(object):
 
 	def __init__(self, cname, cdesc, chealth, cmana, cattacks):
 		self.name = cname
@@ -19,8 +19,21 @@ class Character:
 
 	def getAttacks(self):
 		attacksOut = '\tAttacks: \n'
+		count = 0
 		for attack in self.attacks:
-			attacksOut += '\t\t' + attack['Name'] + ": " + str(attack['Damage']) + '\n'
+			count += 1
+			attacksOut += '\t\t' + str(count) + ". " + attack['Name'] + ": " + str(attack['Damage']) + '\n'
+		
+		return attacksOut
+		
+	def getNumAttacks(self):
+		attacksOut = 0
+		for attack in self.attacks:
+			attacksOut += 1
 		
 		return attacksOut
 
+	def isAlive(self):
+		if self.health > 0:
+			return True
+		return False
