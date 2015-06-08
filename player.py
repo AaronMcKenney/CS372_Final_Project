@@ -7,6 +7,8 @@ class Player(object):
 
 	def __init__(self, psocket, paddr, pname, charinfo):
 		self.sock = psocket
+		self.connected = True
+		self.waitForNextBattle = False
 		self.addr = paddr
 		self.name = pname
 		self.character = Character(charinfo['Name'], charinfo['Description'], charinfo['Health'], charinfo['Mana'], charinfo['Attacks'])
@@ -41,6 +43,28 @@ class Player(object):
 			self.sock.close()
 			return ''
 
+	def disconnect(self):
+		self.sock.close()
+		self.connected = False
+	
+	def reconnect(self, newSock):
+		self.sock = newSock
+		self.connected = False
+		self.waitForNextBattle = True
+
+	def isConnected(self):
+		return self.connected
+		
+	def enable(self):
+		if self.connected == False and self.waitForNextBattle == True:
+			self.connected = True
+			self.waitForNextBattle = False
+		
+	def matches(self, addr, name):
+		if self.addr == addr and self.name == name:
+			return True
+		return False
+		
 	def getName(self):
 		return self.name
 		
@@ -78,13 +102,6 @@ class Player(object):
 		self.send(StatsMsg.party + ownStats + otherPlayerStats)
 		if self.recv() != StatsMsg.ack:
 			print self.name + ' did not receive party stats'
-
-	def isConnected(self):
-		self.send(ConnMsg.ping)
-		if self.recv() != ConnMsg.pong:
-			print self.name + ' disconnected!'
-			return False
-		return True
 		
 	def isAlive(self):
 		return self.character.isAlive()

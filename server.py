@@ -15,16 +15,36 @@ numConnections = 0
 numReady = 0
 everyoneReady = threading.Condition()
 connections = []
+players = []
 
 #mode that the game is in and potential values (enum) for mode
 lobby = 0
-betweenCombat = 1
-inCombat = 2
+inCombat = 1
 
 mode = lobby
 
+def connected(players):
+	connectedPlayers = []
+
+	for player in players:
+		if player.isConnected():
+			connectedPlayers.append(player)
+	return connectedPlayers
+
+def disconnected(players):
+	disconnectedPlayers = []
+	
+	for player in players:
+		if not player.isConnected():
+			disconnectedPlayers.append(player)
+	return disconnectedPlayers
+
+def enableAll(players):
+	for player in players:
+		player.enable()
+	
 def serverThread(ssocket):
-	global numConnections, connections
+	global numConnections, connections, players
 
 	while 1:
 		(csocket, caddr) = ssocket.accept()
@@ -39,6 +59,7 @@ def serverThread(ssocket):
 		cname = msg[headerLen:]
 
 		numConnections += 1
+		
 		if mode == lobby:
 			#We are in the lobby
 			connections.append((csocket, caddr, cname))
@@ -46,6 +67,12 @@ def serverThread(ssocket):
 			csocket.sendall(LobbyMsg.connect)
 			thread.start_new_thread(clientThread, (csocket, caddr, cname))
 
+		elif mode == inCombat:
+			for player in disconnected(players):
+				if player.matches(caddr, cname):
+					player.reconnect(csocket)
+					break
+			
 def clientThread(csocket, caddr, cname):
 	global numConnections, numReady, everyoneReady
 
@@ -130,35 +157,27 @@ def partyLives(players):
 			return True
 	return False
 	
-def removeFromBattle(player, players, turnList):
-	#Remove player from players and from turnList
-	print player.getName() + ' did not recv attack attack msg. Booting from battle'
-	turnList.remove(player)
-	players.remove(player)
-	if len(players) == 0:
-		print 'No remaining players in the party!'
-	
-def Battle(players, curMonster):
+def battle(curMonster):
 	#Battle between players and one monster
 	#Returns 1 if players win, -1 if monster wins,
 	#and 0 if all players disconnects
-
+	global players
+	
 	#Ensures that a player can only be lost from this battle
-	players = list(players)
 	if len(players) == 0:
 		print 'no players in battle!'
-		return
-	for player in players:
+		return 0
+	for player in connected(players):
 		player.send(StatsMsg.monster + curMonster.getStats())
 		if player.recv() != StatsMsg.ack:
-			players.remove(player)
+			player.disconnect()
 		
 	#Get turn order
-	turnList = list(players)
+	turnList = list(players) #list() creates deep copy
 	turnList.append(curMonster)
 	shuffle(turnList)
 	
-	while(curMonster.isAlive() and partyLives(players)):
+	while(curMonster.isAlive() and partyLives(connected(players))):
 		for thing in turnList:
 			if type(thing) is Player and thing.isAlive():
 				#Tell the player it's their turn
@@ -167,8 +186,10 @@ def Battle(players, curMonster):
 				if msg != AttackMsg.ack:
 					#Assume a disconnect, remove them from this battle
 					#Pray that they reconnect before the next battle
-					removeFromBattle(thing, players, turnList)
-					if len(players) == 0:
+					turnList.remove(thing)
+					thing.disconnect()
+					print thing.getName() + ' did not recv attack attack msg. Booting from battle'
+					if len(connected(players)) == 0:
 						return 0
 					continue
 					
@@ -179,23 +200,27 @@ def Battle(players, curMonster):
 				if attackIndex == -1:
 					#Illegal (or bad) attack
 					#Remove them from battle and put them in the corner
-					removeFromBattle(thing, players, turnList)
-					if len(players) == 0:
+					turnList.remove(thing)
+					thing.disconnect()
+					print thing.getName() + ' did not recv attack index msg. Booting from battle'
+					if len(connected(players)) == 0:
 						return 0
 					continue
 				chosenAttack = thing.getAttack(attackIndex-1)
 
 				#Send results of attack to all players
 				resultStr = curMonster.hit(thing, chosenAttack)
-				for player in players:
+				for player in connected(players):
 					player.send(AttackMsg.many + resultStr)
 					msg = player.recv()
 					if msg != AttackMsg.ack:
 						#Assume a disconnect, remove them from this battle
 						#Pray that they reconnect before the next battle
-						removeFromBattle(player, players, turnList)
-						if len(players) == 0:
-							return 0
+						turnList.remove(player)
+						player.disconnect()
+						print player.getName() + ' did not recv player attack attack msg. Booting from battle'
+				if len(connected(players)) == 0:
+					return 0
 				if not curMonster.isAlive():
 					turnList.remove(curMonster)
 					return 1
@@ -204,17 +229,19 @@ def Battle(players, curMonster):
 				#Monster's turn
 				(chosenPlayer, chosenAttack) = curMonster.getRandAttack(players)
 				resultStr = chosenPlayer.hit(curMonster, chosenAttack)
-				for player in players:
+				for player in connected(players):
 					player.send(AttackMsg.many + resultStr)
 					msg = player.recv()
 					if msg != AttackMsg.ack:
-						removeFromBattle(player, players, turnList)
-						if len(players) == 0:
-							return 0
+						turnList.remove(player)
+						player.disconnect()
+						print player.getName() + ' did not recv monster attack attack msg. Booting from battle'
+				if len(connected(players)) == 0:
+					return 0
 				if not partyLives(players):
 					return -1
 def main():
-	global everyoneReady, mode
+	global everyoneReady, mode, players
 
 	ssocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	try:
@@ -237,7 +264,7 @@ def main():
 
 	for client in connections:
 		client[0].sendall(LobbyMsg.beginGame)
-		mode = betweenCombat
+	mode = inCombat
 
 	print("Ready set go!")
 	players = createPlayers()
@@ -249,17 +276,20 @@ def main():
 	#Start Game 
 	res = 0
 	for monster in monsters:
-		res = Battle(players, monster)
+		enableAll(players)
+		res = battle(monster)
 		if res != 1:
 			break
 	
 	if res == -1:
 		end = EndMsg.loss
 		print 'the party has lost'
-	else:
+	elif res == 1:
 		end = EndMsg.win
 		print 'the party has won'
-	for player in players:
+	else:
+		print 'the party has left/disconnected ;~;'
+	for player in connected(players):
 		player.send(end)
 		if player.recv() != EndMsg.ack:
 				print player.getName() + ' did not get EndMsg'				
