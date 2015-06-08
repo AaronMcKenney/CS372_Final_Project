@@ -86,7 +86,7 @@ def clientThread(csocket, caddr, cname):
 	except socket.error as e:
 		csocket.close()
 		numConnections -= 1
-		connections.pop(connections.index((csocket, caddr)))
+		connections.pop(connections.index((csocket, caddr, cname)))
 		if isReady == True:
 			numReady -= 1
 		print caddr[0] + ' closed!'
